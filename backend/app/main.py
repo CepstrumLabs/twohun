@@ -1,10 +1,12 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from .models.stock import Base, Stock
 from .services import stock_service
 import os
+from contextlib import asynccontextmanager
+import logging
 
 # Import correct config based on environment
 if os.getenv('ENV') == 'prod':
@@ -12,7 +14,38 @@ if os.getenv('ENV') == 'prod':
 else:
     from .config.dev import DevConfig as Config
 
-app = FastAPI(debug=Config.DEBUG)
+# Database configuration
+engine = create_engine(Config.DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("="*50)
+    print("Starting FastAPI application...")
+    print("="*50)
+    with engine.begin() as conn:
+        # Create table if not exists using SQL directly
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS stocks (
+                id SERIAL PRIMARY KEY,
+                ticker VARCHAR,
+                company_name VARCHAR,
+                ma_50 FLOAT,
+                ma_200 FLOAT,
+                date DATE,
+                price FLOAT
+            );
+            
+            CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
+            ON stocks(ticker, date);
+        """))
+        conn.commit()
+        print("Database tables created successfully")
+        
+    yield
+    print("Shutting down FastAPI application...")
+
+app = FastAPI(debug=Config.DEBUG, lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
@@ -22,13 +55,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Database configuration
-engine = create_engine(Config.DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create tables
-Base.metadata.create_all(bind=engine)
 
 @app.get("/api/stocks")
 async def get_stocks(

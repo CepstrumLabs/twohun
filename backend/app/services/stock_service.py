@@ -27,8 +27,8 @@ def fetch_stock_data(ticker: str, session: Session, days: int = 7):
         new_entries = []
         for date, row in recent_data.iterrows():
             # Calculate MAs for this date using all historical data
-            ma_50 = hist['Close'].rolling(window=50).mean().loc[date]
-            ma_200 = hist['Close'].rolling(window=200).mean().loc[date]
+            ma_50 = hist['Close'].rolling(window=90).mean().loc[date]
+            ma_200 = hist['Close'].rolling(window=300).mean().loc[date]
             
             # Check if entry already exists
             existing = session.query(Stock).filter(
