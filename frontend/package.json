@@ -15,9 +15,12 @@
     "antd": "^5.23.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1"
+    "react-scripts": "5.0.1",
+    "react-sparklines": "^1.7.0"
   },
   "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "gh-pages": "^6.3.0",
     "serve": "^14.2.1"
   },
   "browserslist": {
@@ -33,4 +36,3 @@
     ]
   }
 }
-
