@@ -48,10 +48,7 @@ jobs:
       
       - name: Install Railway
         run: npm i -g @railway/cli
-        
-      - name: Login to Railway
-        run: railway login -t ${{ secrets.RAILWAY_TOKEN }}
-        
+
       - name: Deploy PostgreSQL and API
         run: |
           cd backend
