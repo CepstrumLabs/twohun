@@ -58,7 +58,7 @@ app.add_middleware(
 
 @app.get("/api/stocks")
 async def get_stocks(
-    days: int = Query(default=7, description="Number of days of history to return")
+    days: int = Query(default=0, description="Number of days of history to return")
 ):
     db = SessionLocal()
     try:

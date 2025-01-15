@@ -13,6 +13,9 @@ class Stock(Base):
     ma_200 = Column(Float)
     date = Column(Date)
     price = Column(Float)
+    roc_50 = Column(Float)
+    roc_200 = Column(Float)
+    signal = Column(String)
 
     # Create composite index for ticker and date
     __table_args__ = (

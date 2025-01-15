@@ -118,4 +118,7 @@ help:
 	@echo "  make db-up    - Start the database"
 	@echo "  make db-down  - Stop the database"
 	@echo "  make db-reset - Reset database schema"
-	@echo "  make down     - Stop all services" 
+	@echo "  make down     - Stop all services"
+
+populate-stocks:
+	cd backend && python -m app.scripts.populate_stocks 
