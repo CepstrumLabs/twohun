@@ -33,7 +33,12 @@ async def lifespan(app: FastAPI):
                 ma_50 FLOAT,
                 ma_200 FLOAT,
                 date DATE,
-                price FLOAT
+                price FLOAT,
+                roc_50 FLOAT,
+                roc_200 FLOAT,
+                signal VARCHAR,
+                roc_50_history FLOAT[],
+                roc_200_history FLOAT[]
             );
             
             CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
@@ -57,12 +62,10 @@ app.add_middleware(
 )
 
 @app.get("/api/stocks")
-async def get_stocks(
-    days: int = Query(default=0, description="Number of days of history to return")
-):
+async def get_stocks():
     db = SessionLocal()
     try:
-        stocks = stock_service.get_recent_stock_data(db, days)
+        stocks = stock_service.get_recent_stock_data(db)
         return stocks
     finally:
         db.close()

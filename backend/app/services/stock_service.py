@@ -3,112 +3,117 @@ import pandas as pd
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from ..models.stock import Stock
+from sqlalchemy import func, and_
 
-def fetch_stock_data(ticker: str, session: Session, days: int = 7):
+def fetch_stock_data(ticker: str, session: Session, days: int = 30):
     """
     Fetch stock data from Yahoo Finance and store daily entries.
     Returns newly created entries.
     """
     try:
-        # Get stock data
-        stock = yf.Ticker(ticker)
+        # Get historical data
+        hist = yf.download(ticker, period="1y")  # Get 1 year of data for better history
+        if hist.empty:
+            raise Exception(f"No data found for {ticker}")
         
-        # Get historical data for calculating MAs
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=600)  # Need 200 days for MA calculation
-        hist = stock.history(start=start_date, end=end_date)
-        
-        # Get company name once
-        company_name = stock.info.get('longName', '')
-        
-        # Process last n days of data
-        recent_data = hist.tail(days)
-        
+        company_name = yf.Ticker(ticker).info.get('longName', ticker)
+        recent_data = hist.tail(days)  # Get last 30 days
         new_entries = []
-        current_data = None  # Initialize outside the loop
         
-        # Get the most recent date in our data
-        most_recent_date = recent_data.index[-1].date()
+        # Calculate moving averages for the entire dataset
+        hist['MA50'] = hist['Close'].rolling(window=50).mean()
+        hist['MA200'] = hist['Close'].rolling(window=200).mean()
         
+        # Calculate ROC for the entire dataset
+        roc_50_values = []
+        roc_200_values = []
+        
+        # Calculate daily ROC values for the entire year
+        for i in range(1, len(hist)):
+            today_ma50 = hist['MA50'].iloc[i]
+            today_ma200 = hist['MA200'].iloc[i]
+            prev_ma50 = hist['MA50'].iloc[i-1]
+            prev_ma200 = hist['MA200'].iloc[i-1]
+            
+            if not (pd.isna(today_ma50) or pd.isna(prev_ma50)):
+                roc_50 = ((today_ma50 - prev_ma50) / prev_ma50) * 100
+                roc_50_values.append(float(roc_50))
+            
+            if not (pd.isna(today_ma200) or pd.isna(prev_ma200)):
+                roc_200 = ((today_ma200 - prev_ma200) / prev_ma200) * 100
+                roc_200_values.append(float(roc_200))
+        
+        # Process recent data for database entries
         for date, row in recent_data.iterrows():
-            # Calculate MAs and signals
-            ma_50 = hist['Close'].rolling(window=50).mean().loc[date]
-            ma_200 = hist['Close'].rolling(window=200).mean().loc[date]
+            ma_50 = hist['MA50'].loc[date]
+            ma_200 = hist['MA200'].loc[date]
             
-            # Get previous day's MAs for crossover detection and ROC
-            prev_date = date - pd.Timedelta(days=1)
-            if prev_date in hist.index:
-                prev_ma_50 = hist['Close'].rolling(window=50).mean().loc[prev_date]
-                prev_ma_200 = hist['Close'].rolling(window=200).mean().loc[prev_date]
-                
-                # Calculate Rate of Change (as percentage)
-                roc_50 = ((ma_50 - prev_ma_50) / prev_ma_50) * 100
-                roc_200 = ((ma_200 - prev_ma_200) / prev_ma_200) * 100
-                
-                # Determine signal
-                signal = 'NEUTRAL'
-                if ma_50 > ma_200 and prev_ma_50 <= prev_ma_200:
+            # Get the most recent ROC values
+            current_roc_50 = roc_50_values[-1] if roc_50_values else 0
+            current_roc_200 = roc_200_values[-1] if roc_200_values else 0
+            
+            # Get last 30 days of ROC history
+            roc_50_history = roc_50_values[-30:]
+            roc_200_history = roc_200_values[-30:]
+            
+            # Determine signal
+            signal = 'NEUTRAL'
+            if ma_50 > ma_200:
+                if hist['MA50'].shift(1).loc[date] <= hist['MA200'].shift(1).loc[date]:
                     signal = 'GOLDEN_CROSS'
-                elif ma_50 < ma_200 and prev_ma_50 >= prev_ma_200:
-                    signal = 'DEATH_CROSS'
-                elif ma_50 > ma_200:
+                else:
                     signal = 'BULLISH'
-                elif ma_50 < ma_200:
+            elif ma_50 < ma_200:
+                if hist['MA50'].shift(1).loc[date] >= hist['MA200'].shift(1).loc[date]:
+                    signal = 'DEATH_CROSS'
+                else:
                     signal = 'BEARISH'
-            else:
-                signal = 'NEUTRAL'
-                roc_50 = 0
-                roc_200 = 0
             
-            # Check if entry already exists
-            existing = session.query(Stock).filter(
-                Stock.ticker == ticker,
-                Stock.date == date.date()
-            ).first()
-            
-            if not existing:
-                new_entry = Stock(
-                    ticker=ticker,
-                    company_name=company_name,
-                    ma_50=float(ma_50),
-                    ma_200=float(ma_200),
-                    date=date.date(),
-                    price=float(row['Close'])
-                )
-                new_entries.append(new_entry)
-            
-            # Store the most recent day's data
-            if date.date() == most_recent_date:
-                current_data = {
-                    'ticker': ticker,
-                    'company_name': company_name,
-                    'ma_50': float(ma_50),
-                    'ma_200': float(ma_200),
-                    'price': float(row['Close']),
-                    'date': date.date()
-                }
+            new_entry = Stock(
+                ticker=ticker,
+                company_name=company_name,
+                ma_50=float(ma_50),
+                ma_200=float(ma_200),
+                date=date.date(),
+                price=float(row['Close']),
+                roc_50=float(current_roc_50),
+                roc_200=float(current_roc_200),
+                signal=signal,
+                roc_50_history=roc_50_history,
+                roc_200_history=roc_200_history
+            )
+            new_entries.append(new_entry)
         
+        # Bulk insert new entries
         if new_entries:
-            session.add_all(new_entries)
+            session.bulk_save_objects(new_entries)
             session.commit()
-            
-        return current_data  # Return only the most recent data
+            return f"Added {len(new_entries)} entries for {ticker}"
+        
+        return f"No new data for {ticker}"
         
     except Exception as e:
         session.rollback()
-        raise Exception(f"Error fetching data for {ticker}: {str(e)}")
+        raise Exception(f"Error processing {ticker}: {str(e)}")
 
 def get_recent_stock_data(session: Session):
     """
     Retrieve only the most recent stock data from database for each ticker.
     Returns only the latest data point for each stock.
     """
-    # Use row_number() window function to get the latest record for each ticker
-    stocks = session.query(Stock).from_self().distinct(
-        Stock.ticker
-    ).order_by(
+    # Subquery to get the latest date for each ticker
+    latest_dates = session.query(
         Stock.ticker,
-        Stock.date.desc()
+        func.max(Stock.date).label('max_date')
+    ).group_by(Stock.ticker).subquery()
+
+    # Join with original table to get full records
+    stocks = session.query(Stock).join(
+        latest_dates,
+        and_(
+            Stock.ticker == latest_dates.c.ticker,
+            Stock.date == latest_dates.c.max_date
+        )
     ).all()
     
     return stocks 

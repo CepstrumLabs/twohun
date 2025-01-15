@@ -1,15 +1,31 @@
 import { Table, Typography, Card } from 'antd';
+import SparklineChart from './SparklineChart';
 const { Text, Title } = Typography;
 
 const StockList = ({ stocks, loading }) => {
-  const lastUpdated = stocks?.[0]?.last_updated;
+  const lastUpdated = stocks?.[0]?.date;
 
-  const RocDisplay = ({ value }) => {
-    const color = value > 0 ? '#52c41a' : value < 0 ? '#f5222d' : 'inherit';
+  // Format the date nicely
+  const formattedDate = lastUpdated ? new Date(lastUpdated).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }) : 'Not available';
+
+  const RocDisplay = ({ roc }) => {
+    if (roc === null || roc === undefined) {
+      return <span>N/A</span>;
+    }
+
+    const value = parseFloat(roc);
+    const isPositive = value > 0;
+    const color = isPositive ? 'green' : value < 0 ? 'red' : 'gray';
+
     return (
-      <Text strong style={{ color }}>
-        {value.toFixed(3)}%
-      </Text>
+      <span style={{ color }}>
+        {isPositive ? '+' : ''}{value.toFixed(2)}%
+      </span>
     );
   };
 
@@ -29,20 +45,48 @@ const StockList = ({ stocks, loading }) => {
       title: 'Price',
       dataIndex: 'price',
       key: 'price',
-      render: (value) => <Text>$ {value.toFixed(2)}</Text>,
+      render: (value) => <Text>$ {value?.toFixed(2)}</Text>,
+    },
+    {
+      title: '50 MA',
+      dataIndex: 'ma_50',
+      key: 'ma_50',
+      render: (value) => <Text>$ {value?.toFixed(2)}</Text>,
     },
     {
       title: '50 MA ROC',
       dataIndex: 'roc_50',
       key: 'roc_50',
-      render: (value) => <RocDisplay value={value} />,
+      render: (value, record) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <RocDisplay roc={value ?? null} />
+          <SparklineChart 
+            data={record.roc_50_history} 
+            color={value > 0 ? 'green' : 'red'} 
+          />
+        </div>
+      ),
       sorter: (a, b) => a.roc_50 - b.roc_50,
+    },
+    {
+      title: '200 MA',
+      dataIndex: 'ma_200',
+      key: 'ma_200',
+      render: (value) => <Text>$ {value?.toFixed(2)}</Text>,
     },
     {
       title: '200 MA ROC',
       dataIndex: 'roc_200',
       key: 'roc_200',
-      render: (value) => <RocDisplay value={value} />,
+      render: (value, record) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <RocDisplay roc={value ?? null} />
+          <SparklineChart 
+            data={record.roc_200_history} 
+            color={value > 0 ? 'green' : 'red'} 
+          />
+        </div>
+      ),
       sorter: (a, b) => a.roc_200 - b.roc_200,
     },
     {

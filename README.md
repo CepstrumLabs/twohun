@@ -64,20 +64,55 @@ docker-compose logs -f
 
 Development mode provides hot-reloading and debugging features for local development.
 
-To start the development servers:
+#### Setup
+1. Create required directories:
+```bash
+mkdir -p prometheus
+```
 
+2. Start development stack with monitoring:
 ```bash
 make dev
 ```
 
-This will:
-- Start the backend on localhost:8000 with auto-reload enabled
-- Launch the frontend dev server on localhost:3000 with hot reloading
-- Enable debug mode for both services
-- Configure CORS for local development
-- Run with a single worker for easier debugging
+#### Monitoring Tools
 
-You can stop both servers at any time by pressing Ctrl+C.
+**Local Development Monitoring**
+- Prometheus: http://localhost:9090
+- Database Metrics: http://localhost:9187/metrics
+- API Documentation: http://localhost:8000/docs
+- API Metrics: http://localhost:8000/metrics
+
+**View Monitoring Dashboard**
+```bash
+make monitor
+```
+
+#### Development Database
+```bash
+# Reset development database
+make db-reset
+
+# View database logs
+docker-compose logs -f db
+
+# Connect to database
+psql -h localhost -U twohun -d twohun_db
+```
+
+#### Debugging Tips
+- Check API logs for database queries
+- Monitor connection pool usage
+- Watch for N+1 query problems
+- Use API metrics for performance optimization
+- Enable SQL query logging for development
+
+#### Development Notes
+- Monitoring endpoints are only enabled in development
+- Database credentials are in .env file
+- Hot-reload is enabled for both frontend and backend
+- API documentation updates automatically
+- Database changes require manual reset
 
 To install all required dependencies before first run:
 
@@ -211,3 +246,64 @@ The script will:
 - Add historical data for each specified stock
 - Skip any existing entries (no duplicates)
 - Report success or failure for each stock
+
+### Monitoring
+
+The application includes comprehensive database monitoring using Prometheus.
+
+#### Setup
+1. Create required directories:
+```bash
+mkdir -p prometheus
+mkdir -p backups
+chmod +x scripts/backup.sh scripts/restore.sh
+```
+
+2. Start production stack:
+```bash
+make prod
+```
+
+#### Database Operations
+
+**Backups**
+```bash
+# Create manual backup
+make backup
+
+# Set up daily backups (2 AM)
+crontab -e
+# Add: 0 2 * * * cd /path/to/your/project && ./scripts/backup.sh
+```
+
+**Restore**
+```bash
+make restore file=backups/backup_20240321_123456.sql.gz
+```
+
+#### Monitoring Dashboards
+- Prometheus: http://localhost:9090
+- Database Metrics: http://localhost:9187/metrics
+
+View monitoring dashboard:
+```bash
+make monitor
+```
+
+#### Container Management
+```bash
+# Check status
+docker-compose -f docker-compose.prod.yml ps
+
+# View logs
+docker-compose -f docker-compose.prod.yml logs -f
+```
+
+#### Important Notes
+- Never commit `.env.prod` to version control
+- Test restore procedures regularly
+- Keep multiple backup copies
+- Monitor disk space and connection count
+- Set up alerts for critical metrics
+- Enable SSL for database connections
+- Regular security audits
