@@ -51,6 +51,6 @@ jobs:
         
       - name: Deploy PostgreSQL and API
         run: |
-          railway up
+          railway up --sercice twohun
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} 
