@@ -51,7 +51,6 @@ jobs:
         
       - name: Deploy PostgreSQL and API
         run: |
-          cd backend
-          railway up --service api
+          railway up
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} 
