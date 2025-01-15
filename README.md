@@ -152,3 +152,62 @@ make prod
 # For building specific environment
 make build ENV=prod
 ```
+
+### Stock Data API
+
+The application provides endpoints to fetch and store historical stock data:
+
+#### Endpoints
+
+1. Get Stock History
+```bash
+# Get last 7 days of data for all stocks
+GET /api/stocks
+
+# Get specific number of days
+GET /api/stocks?days=14
+```
+
+2. Add New Stock Data
+```bash
+# Fetch last 7 days of data for a stock
+POST /api/stocks/AAPL
+
+# Fetch specific number of days
+POST /api/stocks/AAPL?days=14
+```
+
+#### Data Model
+Each stock entry contains:
+- Ticker symbol
+- Company name
+- Date
+- Closing price
+- 50-day moving average
+- 200-day moving average
+
+#### Notes
+- New data points are added as separate entries
+- Duplicate entries (same ticker and date) are prevented
+- Historical data is preserved
+- Moving averages are calculated using 200 days of historical data
+
+### Stock Data Management Scripts
+
+You can add new stock data using the provided utility script:
+
+```bash
+# Add 7 days of data for one or more stocks
+python backend/scripts/add_stocks.py AAPL MSFT GOOGL
+
+# Add specific number of days
+python backend/scripts/add_stocks.py AAPL MSFT --days 14
+
+# Use different API URL (e.g., production)
+python backend/scripts/add_stocks.py AAPL --url https://api.yourdomain.com
+```
+
+The script will:
+- Add historical data for each specified stock
+- Skip any existing entries (no duplicates)
+- Report success or failure for each stock

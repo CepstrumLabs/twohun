@@ -1,48 +1,95 @@
-import React, { useState, useEffect } from 'react';
+import { Table, Typography, Card } from 'antd';
+const { Text, Title } = Typography;
 
-const StockList = () => {
-  const [stocks, setStocks] = useState([]);
+const StockList = ({ stocks, loading }) => {
+  const lastUpdated = stocks?.[0]?.last_updated;
 
-  useEffect(() => {
-    const fetchStocks = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/api/stocks');
-        const data = await response.json();
-        setStocks(data);
-      } catch (error) {
-        console.error('Error fetching stocks:', error);
-      }
-    };
+  const RocDisplay = ({ value }) => {
+    const color = value > 0 ? '#52c41a' : value < 0 ? '#f5222d' : 'inherit';
+    return (
+      <Text strong style={{ color }}>
+        {value.toFixed(3)}%
+      </Text>
+    );
+  };
 
-    fetchStocks();
-  }, []);
+  const columns = [
+    {
+      title: 'Ticker',
+      dataIndex: 'ticker',
+      key: 'ticker',
+      render: (text) => <Text strong>{text}</Text>,
+    },
+    {
+      title: 'Company',
+      dataIndex: 'company_name',
+      key: 'company_name',
+    },
+    {
+      title: 'Price',
+      dataIndex: 'price',
+      key: 'price',
+      render: (value) => <Text>$ {value.toFixed(2)}</Text>,
+    },
+    {
+      title: '50 MA ROC',
+      dataIndex: 'roc_50',
+      key: 'roc_50',
+      render: (value) => <RocDisplay value={value} />,
+      sorter: (a, b) => a.roc_50 - b.roc_50,
+    },
+    {
+      title: '200 MA ROC',
+      dataIndex: 'roc_200',
+      key: 'roc_200',
+      render: (value) => <RocDisplay value={value} />,
+      sorter: (a, b) => a.roc_200 - b.roc_200,
+    },
+    {
+      title: 'Signal',
+      dataIndex: 'signal',
+      key: 'signal',
+      render: (signal) => {
+        let color = 'default';
+        switch (signal) {
+          case 'GOLDEN_CROSS':
+          case 'BULLISH':
+            color = '#52c41a';
+            break;
+          case 'DEATH_CROSS':
+          case 'BEARISH':
+            color = '#f5222d';
+            break;
+          default:
+            color = '#8c8c8c';
+        }
+        return <Text strong style={{ color }}>{signal}</Text>;
+      },
+      filters: [
+        { text: 'Golden Cross', value: 'GOLDEN_CROSS' },
+        { text: 'Death Cross', value: 'DEATH_CROSS' },
+        { text: 'Bullish', value: 'BULLISH' },
+        { text: 'Bearish', value: 'BEARISH' },
+        { text: 'Neutral', value: 'NEUTRAL' },
+      ],
+      onFilter: (value, record) => record.signal === value,
+    },
+  ];
 
   return (
-    <div className="stock-list">
-      <h2>Stock Moving Averages</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Ticker</th>
-            <th>Company Name</th>
-            <th>50-Day MA</th>
-            <th>200-Day MA</th>
-            <th>Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {stocks.map((stock) => (
-            <tr key={stock.id}>
-              <td>{stock.ticker}</td>
-              <td>{stock.company_name}</td>
-              <td>${stock.ma_50.toFixed(2)}</td>
-              <td>${stock.ma_200.toFixed(2)}</td>
-              <td>{new Date(stock.date).toLocaleDateString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Card>
+      <Title level={2}>Stock Market Analysis</Title>
+      <Text type="secondary" style={{ display: 'block', marginBottom: '20px' }}>
+        Last Updated: {lastUpdated}
+      </Text>
+      <Table 
+        columns={columns} 
+        dataSource={stocks} 
+        loading={loading}
+        rowKey="ticker"
+        pagination={false}
+      />
+    </Card>
   );
 };
 
