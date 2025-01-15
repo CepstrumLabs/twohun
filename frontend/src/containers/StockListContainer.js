@@ -8,7 +8,7 @@ const StockListContainer = () => {
   const fetchStocks = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/stocks');
+      const response = await fetch('http://localhost:8000/api/stocks');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

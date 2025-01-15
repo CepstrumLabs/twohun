@@ -122,3 +122,45 @@ help:
 
 populate-stocks:
 	cd backend && python -m app.scripts.populate_stocks 
+
+.PHONY: backup restore monitor
+backup:
+	@echo "Creating database backup..."
+	@bash scripts/backup.sh
+
+restore:
+	@if [ -z "$(file)" ]; then \
+		echo "Usage: make restore file=<backup_file>"; \
+		exit 1; \
+	fi
+	@echo "Restoring from backup: $(file)"
+	@bash scripts/restore.sh $(file)
+
+monitor:
+	@echo "Opening Prometheus monitoring..."
+	@open http://localhost:9090
+
+.PHONY: deploy-frontend deploy-backend deploy
+
+# Deploy frontend to GitHub Pages
+deploy-frontend:
+	@echo "Deploying frontend to GitHub Pages..."
+	cd frontend && npm install gh-pages --save-dev
+	cd frontend && npm run deploy
+	@echo "Frontend deployed successfully!"
+
+# Deploy backend to Railway
+deploy-backend:
+	@echo "Deploying backend to Railway..."
+	@if ! command -v railway &> /dev/null; then \
+		echo "Installing Railway CLI..."; \
+		npm install -g @railway/cli; \
+	fi
+	railway login
+	railway init || true
+	railway up
+	@echo "Backend deployed successfully!"
+
+# Deploy both frontend and backend
+deploy: deploy-frontend deploy-backend
+	@echo "Full deployment completed!"

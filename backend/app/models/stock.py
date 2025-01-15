@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Date, Index
+from sqlalchemy import Column, Integer, String, Float, Date, Index, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -16,6 +16,8 @@ class Stock(Base):
     roc_50 = Column(Float)
     roc_200 = Column(Float)
     signal = Column(String)
+    roc_50_history = Column(ARRAY(Float))
+    roc_200_history = Column(ARRAY(Float))
 
     # Create composite index for ticker and date
     __table_args__ = (
