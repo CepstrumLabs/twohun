@@ -20,15 +20,20 @@ jobs:
           cd frontend
           npm install
           npm install gh-pages --save-dev
+          npm install react-sparklines --save
+          npm install --save-dev @babel/plugin-proposal-private-property-in-object
+          
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
           
       - name: Build and Deploy
         run: |
           cd frontend
-          npm run deploy
+          CI=false npm run deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GIT_CONFIG_NAME: "GitHub Actions"
-          GIT_CONFIG_EMAIL: "actions@github.com"
 
   deploy-backend:
     runs-on: ubuntu-latest
