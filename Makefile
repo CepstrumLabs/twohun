@@ -6,7 +6,13 @@ UVICORN = uvicorn
 BACKEND_APP = backend.app.main:app
 FRONTEND_DIR = frontend
 BACKEND_DIR = backend
+VENV = venv
 ENV ?= dev  # Default to dev environment
+
+# Python venv executables
+VENV_PYTHON = $(VENV)/bin/python
+VENV_PIP = $(VENV)/bin/pip
+VENV_UVICORN = $(VENV)/bin/uvicorn
 
 # Configuration based on environment
 ifeq ($(ENV),dev)
@@ -19,31 +25,33 @@ else
     ENV_FILE = .env.production
 endif
 
-# Development commands
+# Virtual environment setup
+.PHONY: venv
+venv:
+	test -d $(VENV) || $(PYTHON) -m venv $(VENV)
+	$(VENV_PIP) install --upgrade pip
+
+# Install dependencies
 .PHONY: install
-install:
-	cd $(BACKEND_DIR) && $(PIP) install -r requirements.txt
+install: venv
+	$(VENV_PIP) install -r $(BACKEND_DIR)/requirements.txt
 	cd $(FRONTEND_DIR) && $(NPM) install
 
+# Development commands
 .PHONY: dev
-dev:
+dev: venv
 	@trap 'kill %1; kill %2' SIGINT; \
-	cd $(BACKEND_DIR) && ENV=dev $(UVICORN) $(BACKEND_APP) $(BACKEND_CONFIG) & \
-	cd $(FRONTEND_DIR) && ENV_FILE=$(ENV_FILE) $(NPM) start & \
+	cd $(BACKEND_DIR) && $(VENV_UVICORN) $(BACKEND_APP) $(BACKEND_CONFIG) & \
+	cd $(FRONTEND_DIR) && $(NPM) start & \
 	wait
 
 # Production commands
 .PHONY: prod
-prod:
+prod: venv
 	@trap 'kill %1; kill %2' SIGINT; \
-	cd $(BACKEND_DIR) && ENV=prod $(UVICORN) $(BACKEND_APP) $(BACKEND_CONFIG) & \
+	cd $(BACKEND_DIR) && ENV=prod $(VENV_UVICORN) $(BACKEND_APP) $(BACKEND_CONFIG) & \
 	cd $(FRONTEND_DIR) && ENV_FILE=$(ENV_FILE) $(NPM) run build && $(NPM) run serve & \
 	wait
-
-# Build commands
-.PHONY: build
-build:
-	cd $(FRONTEND_DIR) && ENV_FILE=$(ENV_FILE) $(NPM) run build
 
 # Utility commands
 .PHONY: clean
@@ -51,13 +59,13 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type d -name "node_modules" -exec rm -rf {} +
 	find . -type d -name "build" -exec rm -rf {} +
+	rm -rf $(VENV)
 
 .PHONY: help
 help:
 	@echo "Available commands:"
-	@echo "  make install              - Install all dependencies"
-	@echo "  make dev                  - Start development servers"
-	@echo "  make prod                 - Start production servers"
-	@echo "  make build ENV=prod       - Build for production"
-	@echo "  make build ENV=dev        - Build for development"
-	@echo "  make clean               - Clean up generated files" 
+	@echo "  make venv     - Create Python virtual environment"
+	@echo "  make install  - Install all dependencies"
+	@echo "  make dev      - Start development servers"
+	@echo "  make prod     - Start production servers"
+	@echo "  make clean    - Clean up generated files" 
