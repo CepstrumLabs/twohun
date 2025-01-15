@@ -7,6 +7,7 @@ from .services import stock_service
 import os
 from contextlib import asynccontextmanager
 import logging
+import datetime
 
 # Import correct config based on environment
 if os.getenv('ENV') == 'prod':
@@ -86,3 +87,26 @@ async def add_stock(
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         db.close()
+
+@app.get("/health")
+async def health_check():
+    try:
+        # Test database connection
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "unhealthy",
+                "database": "disconnected",
+                "error": str(e),
+                "timestamp": datetime.datetime.now().isoformat()
+            }
+        )
