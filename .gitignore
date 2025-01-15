@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.env
+venv/
+
+# Node/React
+node_modules/
+build/
+.env.development
+.env.production
+
+# Database
+*.db
+
+# IDE
+.idea/
+.vscode/
+
+# OS generated files
+.DS_Store
+Thumbs.db 
+
+.env.prod
+*.env.dev
