@@ -45,11 +45,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      
       - name: Install Railway
         run: npm i -g @railway/cli
+        
       - name: Deploy to Railway
         run: |
           cd backend
-          railway up
+          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --service api
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} 
