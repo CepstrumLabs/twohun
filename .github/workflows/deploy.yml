@@ -50,12 +50,13 @@ jobs:
         run: npm i -g @railway/cli
         
       - name: Login to Railway
-        run: railway login --token ${{ secrets.RAILWAY_TOKEN }}
+        run: railway login -t ${{ secrets.RAILWAY_TOKEN }}
         
-      - name: Deploy to Railway
+      - name: Deploy PostgreSQL and API
         run: |
           cd backend
           railway link --project ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --service postgresql
           railway up --service api
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} 
