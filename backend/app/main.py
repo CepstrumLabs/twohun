@@ -37,30 +37,36 @@ async def lifespan(app: FastAPI):
     logger.info("Starting FastAPI application...")
     logger.info("="*50)
     
-    with get_db_connection() as conn:
-        # Create table if not exists using SQL directly
-        logger.info("Initializing database...")
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS stocks (
-                id SERIAL PRIMARY KEY,
-                ticker VARCHAR,
-                company_name VARCHAR,
-                ma_50 FLOAT,
-                ma_200 FLOAT,
-                date DATE,
-                price FLOAT,
-                roc_50 FLOAT,
-                roc_200 FLOAT,
-                signal VARCHAR,
-                roc_50_history FLOAT[],
-                roc_200_history FLOAT[]
-            );
-            
-            CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
-            ON stocks(ticker, date);
-        """))
-        conn.commit()
-        logger.info("Database tables created successfully")
+    try:
+        logger.info("Attempting to establish database connection...")
+        with get_db_connection() as conn:
+            logger.info("Database connection established successfully")
+            logger.info("Initializing database...")
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS stocks (
+                    id SERIAL PRIMARY KEY,
+                    ticker VARCHAR,
+                    company_name VARCHAR,
+                    ma_50 FLOAT,
+                    ma_200 FLOAT,
+                    date DATE,
+                    price FLOAT,
+                    roc_50 FLOAT,
+                    roc_200 FLOAT,
+                    signal VARCHAR,
+                    roc_50_history FLOAT[],
+                    roc_200_history FLOAT[]
+                );
+                
+                CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
+                ON stocks(ticker, date);
+            """))
+            conn.commit()
+            logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {str(e)}")
+        logger.error(f"Database URL: {Config.DATABASE_URL}")
+        raise  # This will prevent the application from starting if DB init fails
     
     yield
     
