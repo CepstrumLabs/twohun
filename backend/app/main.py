@@ -9,11 +9,20 @@ from contextlib import asynccontextmanager
 import logging
 import datetime
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Import correct config based on environment
 if os.getenv('ENV') == 'prod':
     from .config.prod import ProdConfig as Config
+    logger.info("=== Starting FastAPI in PRODUCTION mode ===")
 else:
     from .config.dev import DevConfig as Config
+    logger.info("=== Starting FastAPI in DEVELOPMENT mode ===")
+
+logger.info(f"CORS_ORIGINS: {Config.CORS_ORIGINS}")
+logger.info(f"DEBUG mode: {Config.DEBUG}")
 
 # Database configuration
 engine = create_engine(Config.DATABASE_URL)
@@ -21,11 +30,13 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("="*50)
-    print("Starting FastAPI application...")
-    print("="*50)
+    logger.info("="*50)
+    logger.info("Starting FastAPI application...")
+    logger.info("="*50)
+    
     with engine.begin() as conn:
         # Create table if not exists using SQL directly
+        logger.info("Initializing database...")
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS stocks (
                 id SERIAL PRIMARY KEY,
@@ -46,10 +57,11 @@ async def lifespan(app: FastAPI):
             ON stocks(ticker, date);
         """))
         conn.commit()
-        print("Database tables created successfully")
+        logger.info("Database tables created successfully")
         
     yield
-    print("Shutting down FastAPI application...")
+    
+    logger.info("Shutting down FastAPI application...")
 
 app = FastAPI(debug=Config.DEBUG, lifespan=lifespan)
 
