@@ -31,7 +31,6 @@ else:
 logger.info(f"CORS_ORIGINS: {Config.CORS_ORIGINS}")
 logger.info(f"DEBUG mode: {Config.DEBUG}")
 
-app = FastAPI(debug=Config.DEBUG, lifespan=lifespan)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("="*50)
@@ -72,6 +71,7 @@ async def lifespan(app: FastAPI):
 
 
 
+app = FastAPI(debug=Config.DEBUG, lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
