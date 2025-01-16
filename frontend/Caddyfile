@@ -1,13 +1,16 @@
 # site block, listens on the $PORT environment variable, automatically assigned by railway
-:{$PORT:3000} {
+:{$PORT} {
 	# access logs
 	log {
 		format json # set access log format to json mode
 	}
 
-	# Proxy to backend API
+	# Proxy to backend API using Railway's assigned port
 	handle /api/* {
-		reverse_proxy twohun.railway.internal:80
+		reverse_proxy twohun.railway.internal:{$PORT} {
+			health_uri /health
+			health_interval 10s
+		}
 	}
 
 	# health check for railway
