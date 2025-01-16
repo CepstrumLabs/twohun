@@ -17,8 +17,6 @@ jobs:
         run: |
           # Deploy PostgreSQL first
           cd backend
-          railway up --service Postgres
-          
           # Get PostgreSQL URL and set it for API
           DB_URL=$(railway variables -k | grep DATABASE_URL)
           railway variables -kv DATABASE_URL="$DB_URL" --service twohun
