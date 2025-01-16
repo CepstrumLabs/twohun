@@ -11,6 +11,7 @@ const StockListContainer = () => {
       setLoading(true);
       const response = await fetch(`${API_URL}/api/stocks`, {
         method: 'GET',
+        mode: 'cors',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
