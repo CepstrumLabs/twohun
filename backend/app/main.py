@@ -31,6 +31,58 @@ else:
 logger.info(f"CORS_ORIGINS: {Config.CORS_ORIGINS}")
 logger.info(f"DEBUG mode: {Config.DEBUG}")
 
+app = FastAPI(debug=Config.DEBUG, lifespan=lifespan)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("="*50)
+    logger.info("Starting FastAPI application...")
+    logger.info("="*50)
+    
+    with get_db_connection() as conn:
+        # Create table if not exists using SQL directly
+        logger.info("Initializing database...")
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS stocks (
+                id SERIAL PRIMARY KEY,
+                ticker VARCHAR,
+                company_name VARCHAR,
+                ma_50 FLOAT,
+                ma_200 FLOAT,
+                date DATE,
+                price FLOAT,
+                roc_50 FLOAT,
+                roc_200 FLOAT,
+                signal VARCHAR,
+                roc_50_history FLOAT[],
+                roc_200_history FLOAT[]
+            );
+            
+            CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
+            ON stocks(ticker, date);
+        """))
+        conn.commit()
+        logger.info("Database tables created successfully")
+    
+    yield
+    
+    logger.info("Shutting down FastAPI application...")
+    # Close any remaining connections in the pool
+    engine.dispose()
+    logger.info("All database connections closed")
+
+
+
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=Config.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 # Database configuration
 logger.info(f"Database URL: {Config.DATABASE_URL}")
 engine = create_engine(
@@ -113,55 +165,6 @@ def get_db_connection():
     finally:
         logger.debug("Database connection closed")
         conn.close()
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("="*50)
-    logger.info("Starting FastAPI application...")
-    logger.info("="*50)
-    
-    with get_db_connection() as conn:
-        # Create table if not exists using SQL directly
-        logger.info("Initializing database...")
-        conn.execute(text("""
-            CREATE TABLE IF NOT EXISTS stocks (
-                id SERIAL PRIMARY KEY,
-                ticker VARCHAR,
-                company_name VARCHAR,
-                ma_50 FLOAT,
-                ma_200 FLOAT,
-                date DATE,
-                price FLOAT,
-                roc_50 FLOAT,
-                roc_200 FLOAT,
-                signal VARCHAR,
-                roc_50_history FLOAT[],
-                roc_200_history FLOAT[]
-            );
-            
-            CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
-            ON stocks(ticker, date);
-        """))
-        conn.commit()
-        logger.info("Database tables created successfully")
-    
-    yield
-    
-    logger.info("Shutting down FastAPI application...")
-    # Close any remaining connections in the pool
-    engine.dispose()
-    logger.info("All database connections closed")
-
-app = FastAPI(debug=Config.DEBUG, lifespan=lifespan)
-
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=Config.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 @app.get("/api/stocks")
 @retry_on_db_error(max_retries=3, delay=1)
