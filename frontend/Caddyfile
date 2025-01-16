@@ -22,7 +22,7 @@
 
     # API proxy pass
     handle /api/* {
-        reverse_proxy twohun.railway.internal:80 {
+        reverse_proxy twohun.railway.internal {
             health_uri /health
             health_interval 10s
             transport http {
