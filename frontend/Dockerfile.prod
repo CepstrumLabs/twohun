@@ -1,6 +1,11 @@
 # Build stage
-FROM node:16-alpine as build
+FROM node:18-alpine as build
 
+# Set config
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+ENV NPM_CONFIG_FUND=false
+
+# Create and change to the app directory.
 WORKDIR /app
 
 # Copy package files first for better caching
