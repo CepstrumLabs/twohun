@@ -57,20 +57,13 @@ for i in {1..30}; do
     sleep 2
 done
 
-# Start Gunicorn with monitoring
-echo "Starting Gunicorn..."
-
-gunicorn app.main:app \
-    -w 4 \
-    -k uvicorn.workers.UvicornWorker \
-    -b 0.0.0.0:$PORT \
-    --log-level debug \
-    --access-logfile - \
-    --error-logfile - \
-    --capture-output \
-    --enable-stdio-inheritance \
-    --timeout 120 \
-    --graceful-timeout 60 \
-    --keep-alive 5 \
-    --log-file=- \
-    --preload 
+# Start Hypercorn with monitoring
+echo "Starting Hypercorn..."
+hypercorn app.main:app \
+    --bind 0.0.0.0:$PORT \
+    --workers 1 \
+    --access-log - \
+    --error-log - \
+    --log-level DEBUG \
+    --keep-alive 120 \
+    --graceful-timeout 60 
