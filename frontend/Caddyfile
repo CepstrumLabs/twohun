@@ -20,18 +20,6 @@
         format json # set access log format to json mode
     }
 
-    # API proxy pass
-    handle /api/* {
-        reverse_proxy https://twohun-production.up.railway.app {
-            health_uri /health
-            health_interval 10s
-            transport http {
-                dial_timeout 10s
-                response_header_timeout 30s
-            }
-        }
-    }
-
     # health check for railway
     rewrite /health /*
 
