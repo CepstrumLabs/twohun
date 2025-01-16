@@ -1,25 +1,28 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react({
-      include: "**/*.{jsx,js}",
+      // Explicitly include JSX files
+      include: /\.(jsx|js)$/,
+      // Add Babel options
+      babel: {
+        presets: ['@babel/preset-react'],
+        plugins: [],
+        babelrc: false,
+        configFile: false,
+      },
     })
   ],
   build: {
     outDir: 'dist',
-    sourcemap: false,
-    minify: 'terser',
-    target: 'es2015'
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src')
+    rollupOptions: {
+      input: {
+        main: './index.html',
+      },
     },
-    extensions: ['.js', '.jsx', '.json']
   },
   server: {
     port: 3000,
