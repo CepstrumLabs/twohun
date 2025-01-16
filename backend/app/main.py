@@ -121,7 +121,7 @@ async def shutdown_event():
         app.state.engine.dispose()
         logger.info("Database engine disposed")
 
-# Move these to helper functions
+# Change this function to use proper FastAPI dependency injection
 def get_db_session():
     if not hasattr(app.state, "SessionLocal"):
         raise RuntimeError("Database not initialized")
@@ -142,22 +142,21 @@ def get_db_connection():
         conn.close()
 
 @app.get("/api/stocks")
-async def get_stocks():
-    with get_db_session() as db:
-        stocks = stock_service.get_recent_stock_data(db)
-        return stocks
+async def get_stocks(db: Session = Depends(get_db_session)):
+    stocks = stock_service.get_recent_stock_data(db)
+    return stocks
 
 @app.post("/api/stocks/{ticker}")
 async def add_stock(
     ticker: str,
+    db: Session = Depends(get_db_session),
     days: int = Query(default=7, description="Number of days of history to fetch")
 ):
-    with get_db_session() as db:
-        new_entries = stock_service.fetch_stock_data(ticker, db, days)
-        return {
-            "message": f"Added {len(new_entries)} new entries for {ticker}",
-            "entries": new_entries
-        }
+    new_entries = stock_service.fetch_stock_data(ticker, db, days)
+    return {
+        "message": f"Added {len(new_entries)} new entries for {ticker}",
+        "entries": new_entries
+    }
 
 # Database check function
 async def check_database():
