@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import create_engine, inspect, text, event
@@ -14,6 +14,7 @@ import datetime
 import traceback
 import sys
 import time
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -58,25 +59,19 @@ def checkout(dbapi_connection, connection_record, connection_proxy):
 def checkin(dbapi_connection, connection_record):
     logger.info("Database connection returned to pool")
 
-# Retry decorator for database operations
+# Simplified retry decorator
 def retry_on_db_error(max_retries=3, delay=1):
     def decorator(func):
         async def wrapper(*args, **kwargs):
             last_error = None
             for attempt in range(max_retries):
                 try:
-                    # Handle both regular functions and FastAPI endpoints
-                    if 'request' in kwargs:
-                        # FastAPI endpoint
-                        return await func(**kwargs)
-                    else:
-                        # Regular async function
-                        return await func(*args, **kwargs)
+                    return await func(*args, **kwargs)
                 except (OperationalError, DisconnectionError) as e:
                     last_error = e
                     logger.warning(f"Database error (attempt {attempt + 1}/{max_retries}): {str(e)}")
                     if attempt + 1 < max_retries:
-                        time.sleep(delay)
+                        await asyncio.sleep(delay)  # Use asyncio.sleep instead of time.sleep
                         logger.info(f"Retrying database connection...")
             logger.error(f"All database connection attempts failed: {str(last_error)}")
             raise HTTPException(
@@ -163,15 +158,36 @@ async def add_stock(
     finally:
         db.close()
 
-@app.get("/health")
-@retry_on_db_error(max_retries=3)
-async def health_check(request: Request):
+# Database check function
+async def check_database():
     try:
-        logger.info(f"Health check: attempting database connection")
         with engine.connect() as conn:
             result = conn.execute(text("SELECT 1"))
             result.fetchone()
-            logger.info("Health check: database connection successful")
+        return True
+    except Exception as e:
+        logger.error(f"Database check failed: {str(e)}")
+        return False
+
+# Health check endpoint without decorator
+@app.get("/health")
+async def health_check():
+    try:
+        logger.info("Health check: attempting database connection")
+        
+        # Try database connection up to 3 times
+        for attempt in range(3):
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("SELECT 1"))
+                    result.fetchone()
+                    logger.info("Health check: database connection successful")
+                    break
+            except Exception as e:
+                if attempt == 2:  # Last attempt
+                    raise e
+                logger.warning(f"Database connection attempt {attempt + 1} failed, retrying...")
+                await asyncio.sleep(1)
         
         return {
             "status": "healthy",
