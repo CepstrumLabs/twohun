@@ -1,6 +1,8 @@
 #!/bin/bash
 
+# Set production environment
 export ENV=prod
+
 # Print environment variables (excluding sensitive data)
 echo "Environment variables:"
 echo "PORT: $PORT"
@@ -31,7 +33,19 @@ except Exception as e:
     sys.exit(1)
 END
 
-# Start Gunicorn
+# Start Gunicorn with monitoring
 echo "Starting Gunicorn..."
-
-exec gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT 
+gunicorn app.main:app \
+    -w 1 \
+    -k uvicorn.workers.UvicornWorker \
+    -b 0.0.0.0:$PORT \
+    --log-level debug \
+    --access-logfile - \
+    --error-logfile - \
+    --capture-output \
+    --enable-stdio-inheritance \
+    --timeout 120 \
+    --graceful-timeout 60 \
+    --keep-alive 5 \
+    --log-file=- \
+    --preload 
