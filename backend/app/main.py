@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect, text, event
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import OperationalError, DisconnectionError
+from sqlalchemy.pool import QueuePool
 from .models.stock import Base, Stock
 from .services import stock_service
 import os
@@ -11,6 +13,7 @@ import logging
 import datetime
 import traceback
 import sys
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,8 +31,48 @@ logger.info(f"CORS_ORIGINS: {Config.CORS_ORIGINS}")
 logger.info(f"DEBUG mode: {Config.DEBUG}")
 
 # Database configuration
-engine = create_engine(Config.DATABASE_URL)
+engine = create_engine(
+    Config.DATABASE_URL,
+    poolclass=QueuePool,
+    pool_size=5,
+    max_overflow=10,
+    pool_timeout=30,
+    pool_pre_ping=True,  # Enable connection health checks
+    pool_recycle=1800,   # Recycle connections after 30 minutes
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Add engine event listeners
+@event.listens_for(engine, 'connect')
+def connect(dbapi_connection, connection_record):
+    logger.info("New database connection established")
+
+@event.listens_for(engine, 'checkout')
+def checkout(dbapi_connection, connection_record, connection_proxy):
+    logger.info("Database connection checked out from pool")
+
+@event.listens_for(engine, 'checkin')
+def checkin(dbapi_connection, connection_record):
+    logger.info("Database connection returned to pool")
+
+# Retry decorator for database operations
+def retry_on_db_error(max_retries=3, delay=1):
+    def decorator(func):
+        async def wrapper(*args, **kwargs):
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    return await func(*args, **kwargs)
+                except (OperationalError, DisconnectionError) as e:
+                    last_error = e
+                    logger.warning(f"Database error (attempt {attempt + 1}/{max_retries}): {str(e)}")
+                    if attempt + 1 < max_retries:
+                        time.sleep(delay)
+                        logger.info(f"Retrying database connection...")
+            logger.error(f"All database connection attempts failed: {str(last_error)}")
+            raise last_error
+        return wrapper
+    return decorator
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -104,25 +147,25 @@ async def add_stock(
         db.close()
 
 @app.get("/health")
+@retry_on_db_error(max_retries=3)
 async def health_check():
     try:
-        # Log connection details for debugging
-        logger.info(f"Attempting to connect to database with URL: {Config.DATABASE_URL}")
-        
+        logger.info(f"Health check: attempting database connection")
         with engine.connect() as conn:
             result = conn.execute(text("SELECT 1"))
             result.fetchone()
+            logger.info("Health check: database connection successful")
         
         return {
             "status": "healthy",
             "database": "connected",
             "database_url": Config.DATABASE_URL.replace(
                 Config.DATABASE_URL.split("@")[0], "***"
-            ),  # Hide credentials
+            ),
             "timestamp": datetime.datetime.now().isoformat()
         }
     except Exception as e:
-        logger.error(f"Database connection error: {str(e)}")
+        logger.error(f"Health check failed: {str(e)}")
         raise HTTPException(
             status_code=503,
             detail={
@@ -215,3 +258,13 @@ async def general_exception_handler(request: Request, exc: Exception):
 @app.get("/test-error")
 async def test_error():
     raise Exception("Test error to check logging")
+
+# Update database session management
+def get_db():
+    db = SessionLocal()
+    try:
+        logger.debug("Database session created")
+        yield db
+    finally:
+        logger.debug("Database session closed")
+        db.close()
