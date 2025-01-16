@@ -8,7 +8,7 @@
   "deploy": {
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
-    "startCommand": "gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker",
+    "startCommand": "./start.sh",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100
   }
