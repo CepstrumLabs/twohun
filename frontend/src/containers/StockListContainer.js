@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import StockList from '../components/StockList';
+import { API_URL } from '../config/api';
 
 const StockListContainer = () => {
   const [stocks, setStocks] = useState([]);
@@ -8,7 +9,7 @@ const StockListContainer = () => {
   const fetchStocks = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000/api/stocks');
+      const response = await fetch(`${API_URL}/api/stocks`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
