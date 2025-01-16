@@ -1,25 +1,40 @@
-# Build stage
-FROM node:16-alpine as build
+# Use the Node alpine official image
+# https://hub.docker.com/_/node
+FROM node:lts-alpine AS build
 
+# Set config
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+ENV NPM_CONFIG_FUND=false
+
+# Create and change to the app directory.
 WORKDIR /app
+
+# Copy the files to the container image
 COPY package*.json ./
-COPY . .
-RUN npm install
+
+# Install packages
+RUN npm ci
+
+# Copy local code to the container image.
+COPY . ./
+
+# Build the app.
 RUN npm run build
 
-# Production stage
-FROM caddy:2-alpine
+# Use the Caddy image
+FROM caddy
 
-# Copy Caddy configuration
-COPY Caddyfile /etc/caddy/Caddyfile
+# Create and change to the app directory.
+WORKDIR /app
 
-# Copy built files to /site for Railway
-COPY --from=build /app/build /site
+# Copy Caddyfile to the container image.
+COPY Caddyfile ./
 
-# Set correct permissions
-RUN chmod -R 755 /site
+# Copy local code to the container image.
+RUN caddy fmt Caddyfile --overwrite
 
-EXPOSE 80
-EXPOSE 443
+# Copy files to the container image.
+COPY --from=build /app/dist ./dist
 
-CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+# Use Caddy to run/serve the app
+CMD ["caddy", "run", "--config", "Caddyfile", "--adapter", "caddyfile"]
