@@ -106,8 +106,8 @@ async def add_stock(
 @app.get("/health")
 async def health_check():
     try:
-        # Print connection details for debugging
-        logging.info(f"Attempting to connect to database with URL: {Config.DATABASE_URL}")
+        # Log connection details for debugging
+        logger.info(f"Attempting to connect to database with URL: {Config.DATABASE_URL}")
         
         with engine.connect() as conn:
             result = conn.execute(text("SELECT 1"))
@@ -122,7 +122,7 @@ async def health_check():
             "timestamp": datetime.datetime.now().isoformat()
         }
     except Exception as e:
-        print(f"Database connection error: {str(e)}")
+        logger.error(f"Database connection error: {str(e)}")
         raise HTTPException(
             status_code=503,
             detail={
