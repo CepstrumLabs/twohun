@@ -10,6 +10,10 @@
     # server options
     servers {
         trusted_proxies static private_ranges 100.0.0.0/8 # trust railway's proxy
+        protocol {
+            experimental_http3  # Enable HTTP/3
+            strict_sni_host    # Require SNI
+        }
     }
 }
 
@@ -46,4 +50,10 @@
 
     # if path doesn't exist, redirect it to 'index.html' for client side routing
     try_files {path} /index.html
+
+    # Add TLS related headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        # ... other security headers ...
+    }
 }
