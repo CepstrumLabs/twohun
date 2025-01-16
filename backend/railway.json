@@ -8,7 +8,7 @@
   "deploy": {
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
-    "startCommand": "./backend/start.sh",
+    "startCommand": "./start.sh",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100
   }
