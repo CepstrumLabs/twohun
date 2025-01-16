@@ -42,10 +42,42 @@ async def lifespan(app: FastAPI):
         logger.info("Database configuration loaded")
         logger.info(f"Database host: {Config.DATABASE_URL.split('@')[-1].split('/')[0]}")
         
-        # Try to establish connection
+        # Initialize database engine and session
+        logger.info("Creating database engine...")
+        engine = create_engine(
+            Config.DATABASE_URL,
+            poolclass=QueuePool,
+            pool_size=5,
+            max_overflow=10,
+            pool_timeout=30,
+            pool_pre_ping=True,
+            pool_recycle=1800,
+        )
+        
+        logger.info("Creating SessionLocal...")
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        
+        # Add engine event listeners
+        @event.listens_for(engine, 'connect')
+        def connect(dbapi_connection, connection_record):
+            logger.info("New database connection established")
+
+        @event.listens_for(engine, 'checkout')
+        def checkout(dbapi_connection, connection_record, connection_proxy):
+            logger.info("Database connection checked out from pool")
+
+        @event.listens_for(engine, 'checkin')
+        def checkin(dbapi_connection, connection_record):
+            logger.info("Database connection returned to pool")
+        
+        # Make engine and SessionLocal available to the app
+        app.state.engine = engine
+        app.state.SessionLocal = SessionLocal
+        
+        # Try to establish initial connection
         logger.info("Attempting to establish database connection...")
         try:
-            with get_db_connection() as conn:
+            with engine.connect() as conn:
                 logger.info("Successfully connected to database")
                 
                 # Try to create tables
@@ -89,8 +121,32 @@ async def lifespan(app: FastAPI):
     logger.info("Application startup completed successfully")
     yield
     logger.info("Shutting down application...")
+    
+    # Cleanup
+    try:
+        app.state.engine.dispose()
+        logger.info("Database engine disposed")
+    except Exception as e:
+        logger.error(f"Error during cleanup: {str(e)}")
 
+# Move these to helper functions
+def get_db_session():
+    if not hasattr(app.state, "SessionLocal"):
+        raise RuntimeError("Database not initialized")
+    db = app.state.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
+def get_db_connection():
+    if not hasattr(app.state, "engine"):
+        raise RuntimeError("Database engine not initialized")
+    conn = app.state.engine.connect()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 app = FastAPI(debug=Config.DEBUG, lifespan=lifespan)
 
@@ -102,90 +158,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-# Database configuration
-logger.info(f"Database URL: {Config.DATABASE_URL}")
-engine = create_engine(
-    Config.DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_pre_ping=True,  # Enable connection health checks
-    pool_recycle=1800,   # Recycle connections after 30 minutes
-)
-logger.info("Database engine created")
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-logger.info("SessionLocal created")
-
-# Add engine event listeners
-@event.listens_for(engine, 'connect')
-def connect(dbapi_connection, connection_record):
-    logger.info("New database connection established")
-
-@event.listens_for(engine, 'checkout')
-def checkout(dbapi_connection, connection_record, connection_proxy):
-    logger.info("Database connection checked out from pool")
-
-@event.listens_for(engine, 'checkin')
-def checkin(dbapi_connection, connection_record):
-    logger.info("Database connection returned to pool")
-
-# Simplified retry decorator
-def retry_on_db_error(max_retries=3, delay=1):
-    def decorator(func):
-        async def wrapper(*args, **kwargs):
-            last_error = None
-            for attempt in range(max_retries):
-                try:
-                    return await func(*args, **kwargs)
-                except (OperationalError, DisconnectionError) as e:
-                    last_error = e
-                    logger.warning(f"Database error (attempt {attempt + 1}/{max_retries}): {str(e)}")
-                    if attempt + 1 < max_retries:
-                        await asyncio.sleep(delay)  # Use asyncio.sleep instead of time.sleep
-                        logger.info(f"Retrying database connection...")
-            logger.error(f"All database connection attempts failed: {str(last_error)}")
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "status": "unhealthy",
-                    "database": "disconnected",
-                    "error": str(last_error),
-                    "timestamp": datetime.datetime.now().isoformat()
-                }
-            )
-        return wrapper
-    return decorator
-
-# Context manager for database sessions
-@contextmanager
-def get_db_session():
-    db = SessionLocal()
-    try:
-        logger.debug("Database session created")
-        yield db
-    except Exception as e:
-        logger.error(f"Database session error: {str(e)}")
-        raise
-    finally:
-        logger.debug("Database session closed")
-        db.close()
-
-# Context manager for raw connections
-@contextmanager
-def get_db_connection():
-    conn = engine.connect()
-    try:
-        logger.debug("Database connection created")
-        yield conn
-    except Exception as e:
-        logger.error(f"Database connection error: {str(e)}")
-        raise
-    finally:
-        logger.debug("Database connection closed")
-        conn.close()
 
 @app.get("/api/stocks")
 @retry_on_db_error(max_retries=3, delay=1)
