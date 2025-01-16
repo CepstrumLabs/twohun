@@ -15,6 +15,6 @@ RUN pip install --no-cache-dir numpy==1.23.5 && \
 
 # Copy application
 COPY . .
-
+ENV ENV=prod
 # Use shell form to expand $PORT
 CMD ["sh", "-c", "gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker"] 
