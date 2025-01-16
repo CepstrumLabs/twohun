@@ -2,13 +2,13 @@ from fastapi import FastAPI, HTTPException, Query, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import create_engine, inspect, text, event
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import OperationalError, DisconnectionError
 from sqlalchemy.pool import QueuePool
 from .models.stock import Base, Stock
 from .services import stock_service
 import os
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 import logging
 import datetime
 import traceback
@@ -86,13 +86,41 @@ def retry_on_db_error(max_retries=3, delay=1):
         return wrapper
     return decorator
 
+# Context manager for database sessions
+@contextmanager
+def get_db_session():
+    db = SessionLocal()
+    try:
+        logger.debug("Database session created")
+        yield db
+    except Exception as e:
+        logger.error(f"Database session error: {str(e)}")
+        raise
+    finally:
+        logger.debug("Database session closed")
+        db.close()
+
+# Context manager for raw connections
+@contextmanager
+def get_db_connection():
+    conn = engine.connect()
+    try:
+        logger.debug("Database connection created")
+        yield conn
+    except Exception as e:
+        logger.error(f"Database connection error: {str(e)}")
+        raise
+    finally:
+        logger.debug("Database connection closed")
+        conn.close()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("="*50)
     logger.info("Starting FastAPI application...")
     logger.info("="*50)
     
-    with engine.begin() as conn:
+    with get_db_connection() as conn:
         # Create table if not exists using SQL directly
         logger.info("Initializing database...")
         conn.execute(text("""
@@ -116,10 +144,13 @@ async def lifespan(app: FastAPI):
         """))
         conn.commit()
         logger.info("Database tables created successfully")
-        
+    
     yield
     
     logger.info("Shutting down FastAPI application...")
+    # Close any remaining connections in the pool
+    engine.dispose()
+    logger.info("All database connections closed")
 
 app = FastAPI(debug=Config.DEBUG, lifespan=lifespan)
 
@@ -133,30 +164,24 @@ app.add_middleware(
 )
 
 @app.get("/api/stocks")
+@retry_on_db_error(max_retries=3, delay=1)
 async def get_stocks():
-    db = SessionLocal()
-    try:
+    with get_db_session() as db:
         stocks = stock_service.get_recent_stock_data(db)
         return stocks
-    finally:
-        db.close()
 
 @app.post("/api/stocks/{ticker}")
+@retry_on_db_error(max_retries=3, delay=1)
 async def add_stock(
     ticker: str,
     days: int = Query(default=7, description="Number of days of history to fetch")
 ):
-    db = SessionLocal()
-    try:
+    with get_db_session() as db:
         new_entries = stock_service.fetch_stock_data(ticker, db, days)
         return {
             "message": f"Added {len(new_entries)} new entries for {ticker}",
             "entries": new_entries
         }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    finally:
-        db.close()
 
 # Database check function
 async def check_database():
@@ -169,16 +194,15 @@ async def check_database():
         logger.error(f"Database check failed: {str(e)}")
         return False
 
-# Health check endpoint without decorator
+# Health check endpoint
 @app.get("/health")
 async def health_check():
     try:
         logger.info("Health check: attempting database connection")
         
-        # Try database connection up to 3 times
         for attempt in range(3):
             try:
-                with engine.connect() as conn:
+                with get_db_connection() as conn:
                     result = conn.execute(text("SELECT 1"))
                     result.fetchone()
                     logger.info("Health check: database connection successful")
@@ -192,22 +216,11 @@ async def health_check():
         return {
             "status": "healthy",
             "database": "connected",
-            "database_url": Config.DATABASE_URL.replace(
-                Config.DATABASE_URL.split("@")[0], "***"
-            ),
             "timestamp": datetime.datetime.now().isoformat()
         }
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "status": "unhealthy",
-                "database": "disconnected",
-                "error": str(e),
-                "timestamp": datetime.datetime.now().isoformat()
-            }
-        )
+        raise HTTPException(status_code=503, detail=str(e))
 
 @app.middleware("http")
 async def catch_exceptions_middleware(request: Request, call_next):
@@ -291,13 +304,3 @@ async def general_exception_handler(request: Request, exc: Exception):
 @app.get("/test-error")
 async def test_error():
     raise Exception("Test error to check logging")
-
-# Update database session management
-def get_db():
-    db = SessionLocal()
-    try:
-        logger.debug("Database session created")
-        yield db
-    finally:
-        logger.debug("Database session closed")
-        db.close()
