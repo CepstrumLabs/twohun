@@ -34,8 +34,7 @@ COPY Caddyfile /etc/caddy/Caddyfile
 # Copy the built files from Vite's output
 COPY --from=build /app/dist ./dist
 
-# Expose both IPv4 and IPv6
-EXPOSE ${PORT}/tcp
-EXPOSE ${PORT}/tcp6
+# Expose port (simpler syntax)
+EXPOSE ${PORT}
 
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
