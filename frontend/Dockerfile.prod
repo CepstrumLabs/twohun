@@ -2,10 +2,20 @@
 FROM node:16-alpine as build
 
 WORKDIR /app
+
+# Copy package files first for better caching
 COPY package*.json ./
-COPY . .
 RUN npm install
-RUN npm run build
+
+# Copy the rest of the files
+COPY . .
+
+# Set NODE_ENV and build
+ENV NODE_ENV=production
+ENV VITE_API_URL=http://twohun.railway.internal
+
+# Add --mode production flag to vite build
+RUN npm run build -- --mode production
 
 # Production stage
 FROM caddy:2-alpine
