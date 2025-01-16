@@ -31,6 +31,7 @@ logger.info(f"CORS_ORIGINS: {Config.CORS_ORIGINS}")
 logger.info(f"DEBUG mode: {Config.DEBUG}")
 
 # Database configuration
+logger.info(f"Database URL: {Config.DATABASE_URL}")
 engine = create_engine(
     Config.DATABASE_URL,
     poolclass=QueuePool,
@@ -40,7 +41,9 @@ engine = create_engine(
     pool_pre_ping=True,  # Enable connection health checks
     pool_recycle=1800,   # Recycle connections after 30 minutes
 )
+logger.info("Database engine created")
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+logger.info("SessionLocal created")
 
 # Add engine event listeners
 @event.listens_for(engine, 'connect')
@@ -62,7 +65,13 @@ def retry_on_db_error(max_retries=3, delay=1):
             last_error = None
             for attempt in range(max_retries):
                 try:
-                    return await func(*args, **kwargs)
+                    # Handle both regular functions and FastAPI endpoints
+                    if 'request' in kwargs:
+                        # FastAPI endpoint
+                        return await func(**kwargs)
+                    else:
+                        # Regular async function
+                        return await func(*args, **kwargs)
                 except (OperationalError, DisconnectionError) as e:
                     last_error = e
                     logger.warning(f"Database error (attempt {attempt + 1}/{max_retries}): {str(e)}")
@@ -70,7 +79,15 @@ def retry_on_db_error(max_retries=3, delay=1):
                         time.sleep(delay)
                         logger.info(f"Retrying database connection...")
             logger.error(f"All database connection attempts failed: {str(last_error)}")
-            raise last_error
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "status": "unhealthy",
+                    "database": "disconnected",
+                    "error": str(last_error),
+                    "timestamp": datetime.datetime.now().isoformat()
+                }
+            )
         return wrapper
     return decorator
 
@@ -148,7 +165,7 @@ async def add_stock(
 
 @app.get("/health")
 @retry_on_db_error(max_retries=3)
-async def health_check():
+async def health_check(request: Request):
     try:
         logger.info(f"Health check: attempting database connection")
         with engine.connect() as conn:

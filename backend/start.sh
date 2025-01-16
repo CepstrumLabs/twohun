@@ -33,6 +33,18 @@ except Exception as e:
     sys.exit(1)
 END
 
+# Add PostgreSQL health check
+echo "Waiting for PostgreSQL..."
+for i in {1..30}; do
+    if pg_isready -h $DB_HOST -p $DB_PORT; then
+        echo "PostgreSQL is ready!"
+        break
+    fi
+    
+    echo "Waiting for PostgreSQL... attempt $i of 30"
+    sleep 2
+done
+
 # Start Gunicorn with monitoring
 echo "Starting Gunicorn..."
 
