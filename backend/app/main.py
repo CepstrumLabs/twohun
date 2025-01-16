@@ -92,7 +92,7 @@ async def add_stock(
 async def health_check():
     try:
         # Print connection details for debugging
-        print(f"Attempting to connect to database with URL: {Config.DATABASE_URL}")
+        logging.info(f"Attempting to connect to database with URL: {Config.DATABASE_URL}")
         
         with engine.connect() as conn:
             result = conn.execute(text("SELECT 1"))
