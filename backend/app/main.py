@@ -75,32 +75,34 @@ async def startup_event():
         # Try to establish initial connection
         logger.info("Testing database connection...")
         with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-            logger.info("Database connection successful")
-            
-            # Create tables
-            logger.info("Initializing database tables...")
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS stocks (
-                    id SERIAL PRIMARY KEY,
-                    ticker VARCHAR,
-                    company_name VARCHAR,
-                    ma_50 FLOAT,
-                    ma_200 FLOAT,
-                    date DATE,
-                    price FLOAT,
-                    roc_50 FLOAT,
-                    roc_200 FLOAT,
-                    signal VARCHAR,
-                    roc_50_history FLOAT[],
-                    roc_200_history FLOAT[]
-                );
+            # Start a transaction
+            with conn.begin():
+                conn.execute(text("SELECT 1"))
+                logger.info("Database connection successful")
                 
-                CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
-                ON stocks(ticker, date);
-            """))
-            conn.commit()
-            logger.info("Database tables created successfully")
+                # Create tables
+                logger.info("Initializing database tables...")
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS stocks (
+                        id SERIAL PRIMARY KEY,
+                        ticker VARCHAR,
+                        company_name VARCHAR,
+                        ma_50 FLOAT,
+                        ma_200 FLOAT,
+                        date DATE,
+                        price FLOAT,
+                        roc_50 FLOAT,
+                        roc_200 FLOAT,
+                        signal VARCHAR,
+                        roc_50_history FLOAT[],
+                        roc_200_history FLOAT[]
+                    );
+                    
+                    CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
+                    ON stocks(ticker, date);
+                """))
+                # No need for explicit commit - transaction will handle it
+                logger.info("Database tables created successfully")
             
     except Exception as e:
         logger.error("="*50)
