@@ -25,13 +25,17 @@ RUN npm run build -- --mode production
 # Production stage
 FROM caddy:2-alpine
 
+# Enable IPv6
+RUN apk add --no-cache ip6tables
+
 WORKDIR /srv
 COPY Caddyfile /etc/caddy/Caddyfile
 
 # Copy the built files from Vite's output
 COPY --from=build /app/dist ./dist
 
-
-EXPOSE ${PORT}
+# Expose both IPv4 and IPv6
+EXPOSE ${PORT}/tcp
+EXPOSE ${PORT}/tcp6
 
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]

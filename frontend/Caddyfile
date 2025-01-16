@@ -6,10 +6,14 @@
     # runtime logs
     log {
         format json # set runtime log format to json mode 
+        level INFO
     }
     # server options
     servers {
         trusted_proxies static private_ranges 100.0.0.0/8 # trust railway's proxy
+        protocols h1
+        listen [::]:${PORT} # IPv6
+        listen :${PORT}     # IPv4
     }
 }
 
@@ -18,6 +22,7 @@
     # access logs
     log {
         format json # set access log format to json mode
+        level INFO
     }
 
     # health check for railway
@@ -34,4 +39,26 @@
 
     # if path doesn't exist, redirect it to 'index.html' for client side routing
     try_files {path} /index.html
+
+    # Debug route
+    handle /debug {
+        respond "Caddy is working!"
+    }
+
+    # API proxy with IPv6 support
+    handle /api/* {
+        reverse_proxy twohun.railway.internal:{$PORT} {
+            transport http {
+                versions 1.1
+                dial_network tcp6  # Force IPv6 for upstream
+            }
+        }
+    }
+
+    # Static file serving
+    handle {
+        root * dist
+        try_files {path} /index.html
+        file_server
+    }
 }
