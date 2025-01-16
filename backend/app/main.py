@@ -131,6 +131,7 @@ def get_db_session():
     finally:
         db.close()
 
+@contextmanager
 def get_db_connection():
     if not hasattr(app.state, "engine"):
         raise RuntimeError("Database engine not initialized")
@@ -177,11 +178,12 @@ async def health_check():
         
         for attempt in range(3):
             try:
-                with get_db_connection() as conn:
-                    result = conn.execute(text("SELECT 1"))
-                    result.fetchone()
-                    logger.info("Health check: database connection successful")
-                    break
+                with app.state.engine.connect() as conn:
+                    with conn.begin():
+                        result = conn.execute(text("SELECT 1"))
+                        result.fetchone()
+                        logger.info("Health check: database connection successful")
+                        break
             except Exception as e:
                 if attempt == 2:  # Last attempt
                     raise e
@@ -195,7 +197,15 @@ async def health_check():
         }
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(status_code=503, detail=str(e))
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "database": "disconnected",
+                "error": str(e),
+                "timestamp": datetime.datetime.now().isoformat()
+            }
+        )
 
 @app.middleware("http")
 async def catch_exceptions_middleware(request: Request, call_next):
