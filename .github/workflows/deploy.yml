@@ -15,6 +15,7 @@ jobs:
         
       - name: Deploy Services
         run: |
+          set -x
           # Deploy PostgreSQL first
           cd backend
           # Get PostgreSQL URL and set it for API
