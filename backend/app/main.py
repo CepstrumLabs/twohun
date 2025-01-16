@@ -31,8 +31,19 @@ else:
 logger.info(f"CORS_ORIGINS: {Config.CORS_ORIGINS}")
 logger.info(f"DEBUG mode: {Config.DEBUG}")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+app = FastAPI(debug=Config.DEBUG)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=Config.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.on_event("startup")
+async def startup_event():
     logger.info("="*50)
     logger.info("Starting FastAPI application...")
     logger.info("="*50)
@@ -57,77 +68,56 @@ async def lifespan(app: FastAPI):
         logger.info("Creating SessionLocal...")
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         
-        # Add engine event listeners
-        @event.listens_for(engine, 'connect')
-        def connect(dbapi_connection, connection_record):
-            logger.info("New database connection established")
-
-        @event.listens_for(engine, 'checkout')
-        def checkout(dbapi_connection, connection_record, connection_proxy):
-            logger.info("Database connection checked out from pool")
-
-        @event.listens_for(engine, 'checkin')
-        def checkin(dbapi_connection, connection_record):
-            logger.info("Database connection returned to pool")
-        
-        # Make engine and SessionLocal available to the app
+        # Store in app state
         app.state.engine = engine
         app.state.SessionLocal = SessionLocal
         
         # Try to establish initial connection
-        logger.info("Attempting to establish database connection...")
-        try:
-            with engine.connect() as conn:
-                logger.info("Successfully connected to database")
+        logger.info("Testing database connection...")
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            logger.info("Database connection successful")
+            
+            # Create tables
+            logger.info("Initializing database tables...")
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS stocks (
+                    id SERIAL PRIMARY KEY,
+                    ticker VARCHAR,
+                    company_name VARCHAR,
+                    ma_50 FLOAT,
+                    ma_200 FLOAT,
+                    date DATE,
+                    price FLOAT,
+                    roc_50 FLOAT,
+                    roc_200 FLOAT,
+                    signal VARCHAR,
+                    roc_50_history FLOAT[],
+                    roc_200_history FLOAT[]
+                );
                 
-                # Try to create tables
-                logger.info("Starting database initialization...")
-                try:
-                    conn.execute(text("""
-                        CREATE TABLE IF NOT EXISTS stocks (
-                            id SERIAL PRIMARY KEY,
-                            ticker VARCHAR,
-                            company_name VARCHAR,
-                            ma_50 FLOAT,
-                            ma_200 FLOAT,
-                            date DATE,
-                            price FLOAT,
-                            roc_50 FLOAT,
-                            roc_200 FLOAT,
-                            signal VARCHAR,
-                            roc_50_history FLOAT[],
-                            roc_200_history FLOAT[]
-                        );
-                        
-                        CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
-                        ON stocks(ticker, date);
-                    """))
-                    conn.commit()
-                    logger.info("Database tables created successfully")
-                except Exception as table_error:
-                    logger.error(f"Failed to create tables: {str(table_error)}")
-                    raise
-        except Exception as conn_error:
-            logger.error(f"Failed to connect to database: {str(conn_error)}")
-            raise
+                CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
+                ON stocks(ticker, date);
+            """))
+            conn.commit()
+            logger.info("Database tables created successfully")
             
     except Exception as e:
         logger.error("="*50)
         logger.error("CRITICAL: Application startup failed")
         logger.error(f"Error: {str(e)}")
+        logger.error(traceback.format_exc())
         logger.error("="*50)
         raise
 
     logger.info("Application startup completed successfully")
-    yield
+
+@app.on_event("shutdown")
+async def shutdown_event():
     logger.info("Shutting down application...")
-    
-    # Cleanup
-    try:
+    if hasattr(app.state, "engine"):
         app.state.engine.dispose()
         logger.info("Database engine disposed")
-    except Exception as e:
-        logger.error(f"Error during cleanup: {str(e)}")
 
 # Move these to helper functions
 def get_db_session():
@@ -148,26 +138,13 @@ def get_db_connection():
     finally:
         conn.close()
 
-app = FastAPI(debug=Config.DEBUG, lifespan=lifespan)
-
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=Config.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 @app.get("/api/stocks")
-@retry_on_db_error(max_retries=3, delay=1)
 async def get_stocks():
     with get_db_session() as db:
         stocks = stock_service.get_recent_stock_data(db)
         return stocks
 
 @app.post("/api/stocks/{ticker}")
-@retry_on_db_error(max_retries=3, delay=1)
 async def add_stock(
     ticker: str,
     days: int = Query(default=7, description="Number of days of history to fetch")
