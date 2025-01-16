@@ -23,6 +23,7 @@ jobs:
           railway variables -kv DATABASE_URL="$DB_URL" --service twohun
           
           # Deploy API
+          railway link --project ${{ secrets.RAILWAY_PROJECT_ID }}
           railway up --service twohun
           
           # Get API URL and set it for frontend
