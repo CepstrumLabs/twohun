@@ -30,6 +30,7 @@ jobs:
           API_URL=$(railway variables -k | grep SERVICE_URL --service twohun)
           cd ../frontend
           railway variables -kv REACT_APP_API_URL="$API_URL" --service frontend
+          railway link --project ${{ secrets.RAILWAY_PROJECT_ID }}
           railway up --service frontend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} 
