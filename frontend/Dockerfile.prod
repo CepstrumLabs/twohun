@@ -16,10 +16,10 @@ COPY --from=build /app/build /usr/share/nginx/html
 COPY default.conf /etc/nginx/conf.d/default.conf
 
 # Copy and make startup script executable
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
+COPY start.sh .
+RUN chmod +x ./start.sh
 
 EXPOSE 80
 
-# Use startup script
-CMD ["/start.sh"]
+# # Use startup script
+# CMD ["./start.sh"]
