@@ -34,10 +34,4 @@
 
     # if path doesn't exist, redirect it to 'index.html' for client side routing
     try_files {path} /index.html
-
-    # Add TLS related headers
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        # ... other security headers ...
-    }
 }
