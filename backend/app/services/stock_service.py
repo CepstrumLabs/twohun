@@ -99,7 +99,7 @@ def fetch_stock_data(ticker: str, session: Session, days: int = 30):
 def get_recent_stock_data(session: Session):
     """
     Retrieve only the most recent stock data from database for each ticker.
-    Returns only the latest data point for each stock.
+    Returns only the latest data point for each stock, ensuring uniqueness.
     """
     # Subquery to get the latest date for each ticker
     latest_dates = session.query(
@@ -107,8 +107,8 @@ def get_recent_stock_data(session: Session):
         func.max(Stock.date).label('max_date')
     ).group_by(Stock.ticker).subquery()
 
-    # Join with original table to get full records
-    stocks = session.query(Stock).join(
+    # Join with original table to get full records and ensure uniqueness
+    stocks = session.query(Stock).distinct(Stock.ticker).join(
         latest_dates,
         and_(
             Stock.ticker == latest_dates.c.ticker,
