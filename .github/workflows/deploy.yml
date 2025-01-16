@@ -21,17 +21,17 @@ jobs:
           railway up --service postgresql
           
           # Get PostgreSQL URL and set it for API
-          DB_URL=$(railway variables get DATABASE_URL --service postgresql)
-          railway variables set DATABASE_URL="$DB_URL" --service api
+          DB_URL=$(railway variables -k | grep DATABASE_URL)
+          railway variables -kv DATABASE_URL="$DB_URL" --service twohun
           
           # Deploy API
-          railway up --service api
+          railway up --service twohun
           
           # Get API URL and set it for frontend
-          API_URL=$(railway variables get SERVICE_URL --service api)
+          API_URL=$(railway variables -k | grep SERVICE_URL --service twohun)
           cd ../frontend
           railway link --project ${{ secrets.RAILWAY_PROJECT_ID }}
-          railway variables set REACT_APP_API_URL="$API_URL" --service frontend
+          railway variables -kv REACT_APP_API_URL="$API_URL" --service frontend
           railway up --service frontend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} 
