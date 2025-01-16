@@ -15,15 +15,23 @@ jobs:
         
       - name: Deploy Services
         run: |
-          # Deploy Backend
+          # Deploy PostgreSQL first
           cd backend
           railway link --project ${{ secrets.RAILWAY_PROJECT_ID }}
           railway up --service postgresql
+          
+          # Get PostgreSQL URL and set it for API
+          DB_URL=$(railway variables get DATABASE_URL --service postgresql)
+          railway variables set DATABASE_URL="$DB_URL" --service api
+          
+          # Deploy API
           railway up --service api
           
-          # Deploy Frontend
+          # Get API URL and set it for frontend
+          API_URL=$(railway variables get SERVICE_URL --service api)
           cd ../frontend
           railway link --project ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway variables set REACT_APP_API_URL="$API_URL" --service frontend
           railway up --service frontend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }} 
