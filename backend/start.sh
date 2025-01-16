@@ -9,6 +9,18 @@ echo "PORT: $PORT"
 echo "DATABASE_URL: ${DATABASE_URL:0:25}..." # Only show first 25 chars
 echo "CORS_ORIGINS: $CORS_ORIGINS"
 
+# Extract database host and port from DATABASE_URL
+if [[ $DATABASE_URL =~ [@]([^:]+)[:]([0-9]+)[/] ]]; then
+    DB_HOST="${BASH_REMATCH[1]}"
+    DB_PORT="${BASH_REMATCH[2]}"
+    echo "Extracted database connection info:"
+    echo "DB_HOST: $DB_HOST"
+    echo "DB_PORT: $DB_PORT"
+else
+    echo "Failed to extract database host and port from DATABASE_URL"
+    exit 1
+fi
+
 # Test database connection
 echo "Testing database connection..."
 python << END
@@ -36,7 +48,7 @@ END
 # Add PostgreSQL health check
 echo "Waiting for PostgreSQL..."
 for i in {1..30}; do
-    if pg_isready -h $DB_HOST -p $DB_PORT; then
+    if pg_isready -h "$DB_HOST" -p "$DB_PORT"; then
         echo "PostgreSQL is ready!"
         break
     fi
