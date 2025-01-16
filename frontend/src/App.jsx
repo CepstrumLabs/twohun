@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import StockListContainer from './containers/StockListContainer';
+import StockListContainer from './containers/StockListContainer.jsx';
 
 function App() {
   const [currentDate, setCurrentDate] = useState('');
