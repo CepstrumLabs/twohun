@@ -9,12 +9,12 @@ const StockListContainer = () => {
   const fetchStocks = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/stocks`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setStocks(data);
+    //   const response = await fetch(`${API_URL}/api/stocks`);
+    //   if (!response.ok) {
+    //     throw new Error(`HTTP error! status: ${response.status}`);
+    //   }
+    //   const data = await response.json();
+      setStocks([]);
     } catch (error) {
       console.error('Error fetching stocks:', error);
       // You might want to add error handling UI here
