@@ -9,12 +9,19 @@ const StockListContainer = () => {
   const fetchStocks = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/stocks`);
+      const response = await fetch(`${API_URL}/api/stocks`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        credentials: 'include', // This is needed if your API uses cookies
+      });
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      setStocks([]);
+      setStocks(data); // Also fixed this to actually use the data instead of empty array
     } catch (error) {
       console.error('Error fetching stocks:', error);
       // You might want to add error handling UI here
