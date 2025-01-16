@@ -159,15 +159,6 @@ async def add_stock(
     }
 
 # Database check function
-async def check_database():
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT 1"))
-            result.fetchone()
-        return True
-    except Exception as e:
-        logger.error(f"Database check failed: {str(e)}")
-        return False
 
 # Health check endpoint
 @app.get("/health")

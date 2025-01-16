@@ -122,7 +122,6 @@ const StockList = ({ stocks, loading }) => {
 
   return (
     <Card>
-      <Title level={2}>Stock Market Analysis</Title>
       <Text type="secondary" style={{ display: 'block', marginBottom: '20px' }}>
         Last Updated: {lastUpdated}
       </Text>
