@@ -49,7 +49,7 @@ done
 echo "Starting Gunicorn..."
 
 gunicorn app.main:app \
-    -w 1 \
+    -w 4 \
     -k uvicorn.workers.UvicornWorker \
     -b 0.0.0.0:$PORT \
     --log-level debug \
