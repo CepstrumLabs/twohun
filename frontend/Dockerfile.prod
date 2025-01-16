@@ -22,4 +22,4 @@ RUN chmod +x ./start.sh
 EXPOSE 80
 
 # # Use startup script
-# CMD ["./start.sh"]
+CMD ["./start.sh"]
