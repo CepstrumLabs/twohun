@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from .models.stock import Base, Stock
@@ -8,6 +9,8 @@ import os
 from contextlib import asynccontextmanager
 import logging
 import datetime
+import traceback
+import sys
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -129,3 +132,86 @@ async def health_check():
                 "timestamp": datetime.datetime.now().isoformat()
             }
         )
+
+@app.middleware("http")
+async def catch_exceptions_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as e:
+        # Get full traceback
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        
+        # Format the traceback
+        tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        tb_text = ''.join(tb_lines)
+        
+        # Log the full error
+        logger.error(f"=== Unhandled Exception ===")
+        logger.error(f"URL: {request.url}")
+        logger.error(f"Method: {request.method}")
+        logger.error(f"Headers: {request.headers}")
+        logger.error(f"Exception: {str(e)}")
+        logger.error(f"Traceback:\n{tb_text}")
+        logger.error("="*50)
+        
+        # Return error response
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": {
+                    "error": str(e),
+                    "type": exc_type.__name__,
+                    "path": str(request.url),
+                    "method": request.method,
+                    "timestamp": datetime.datetime.now().isoformat()
+                }
+            }
+        )
+
+# Add error handlers for specific exceptions
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    logger.error(f"HTTP Exception: {exc.status_code} - {exc.detail}")
+    logger.error(f"URL: {request.url}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": {
+                "error": exc.detail,
+                "path": str(request.url),
+                "method": request.method,
+                "timestamp": datetime.datetime.now().isoformat()
+            }
+        }
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    # Get full traceback
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    tb_text = ''.join(tb_lines)
+    
+    logger.error(f"=== General Exception ===")
+    logger.error(f"URL: {request.url}")
+    logger.error(f"Method: {request.method}")
+    logger.error(f"Exception: {str(exc)}")
+    logger.error(f"Traceback:\n{tb_text}")
+    logger.error("="*50)
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": {
+                "error": str(exc),
+                "type": exc_type.__name__,
+                "path": str(request.url),
+                "method": request.method,
+                "timestamp": datetime.datetime.now().isoformat()
+            }
+        }
+    )
+
+@app.get("/test-error")
+async def test_error():
+    raise Exception("Test error to check logging")
