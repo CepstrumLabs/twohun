@@ -35,6 +35,7 @@ END
 
 # Start Gunicorn with monitoring
 echo "Starting Gunicorn..."
+
 gunicorn app.main:app \
     -w 1 \
     -k uvicorn.workers.UvicornWorker \
