@@ -38,42 +38,57 @@ async def lifespan(app: FastAPI):
     logger.info("="*50)
     
     try:
+        # Log database configuration (without sensitive info)
+        logger.info("Database configuration loaded")
+        logger.info(f"Database host: {Config.DATABASE_URL.split('@')[-1].split('/')[0]}")
+        
+        # Try to establish connection
         logger.info("Attempting to establish database connection...")
-        with get_db_connection() as conn:
-            logger.info("Database connection established successfully")
-            logger.info("Initializing database...")
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS stocks (
-                    id SERIAL PRIMARY KEY,
-                    ticker VARCHAR,
-                    company_name VARCHAR,
-                    ma_50 FLOAT,
-                    ma_200 FLOAT,
-                    date DATE,
-                    price FLOAT,
-                    roc_50 FLOAT,
-                    roc_200 FLOAT,
-                    signal VARCHAR,
-                    roc_50_history FLOAT[],
-                    roc_200_history FLOAT[]
-                );
+        try:
+            with get_db_connection() as conn:
+                logger.info("Successfully connected to database")
                 
-                CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
-                ON stocks(ticker, date);
-            """))
-            conn.commit()
-            logger.info("Database tables created successfully")
+                # Try to create tables
+                logger.info("Starting database initialization...")
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS stocks (
+                            id SERIAL PRIMARY KEY,
+                            ticker VARCHAR,
+                            company_name VARCHAR,
+                            ma_50 FLOAT,
+                            ma_200 FLOAT,
+                            date DATE,
+                            price FLOAT,
+                            roc_50 FLOAT,
+                            roc_200 FLOAT,
+                            signal VARCHAR,
+                            roc_50_history FLOAT[],
+                            roc_200_history FLOAT[]
+                        );
+                        
+                        CREATE INDEX IF NOT EXISTS ix_stocks_ticker_date 
+                        ON stocks(ticker, date);
+                    """))
+                    conn.commit()
+                    logger.info("Database tables created successfully")
+                except Exception as table_error:
+                    logger.error(f"Failed to create tables: {str(table_error)}")
+                    raise
+        except Exception as conn_error:
+            logger.error(f"Failed to connect to database: {str(conn_error)}")
+            raise
+            
     except Exception as e:
-        logger.error(f"Failed to initialize database: {str(e)}")
-        logger.error(f"Database URL: {Config.DATABASE_URL}")
-        raise  # This will prevent the application from starting if DB init fails
-    
+        logger.error("="*50)
+        logger.error("CRITICAL: Application startup failed")
+        logger.error(f"Error: {str(e)}")
+        logger.error("="*50)
+        raise
+
+    logger.info("Application startup completed successfully")
     yield
-    
-    logger.info("Shutting down FastAPI application...")
-    # Close any remaining connections in the pool
-    engine.dispose()
-    logger.info("All database connections closed")
+    logger.info("Shutting down application...")
 
 
 
