@@ -24,7 +24,7 @@ RUN npm run build
 # Use the Caddy image
 FROM caddy
 
-
+WORKDIR /app
 # Copy Caddyfile to the container image.
 COPY Caddyfile ./
 
