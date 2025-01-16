@@ -1,5 +1,6 @@
 #!/bin/bash
 
+export ENV=prod
 # Print environment variables (excluding sensitive data)
 echo "Environment variables:"
 echo "PORT: $PORT"
@@ -32,4 +33,5 @@ END
 
 # Start Gunicorn
 echo "Starting Gunicorn..."
+
 exec gunicorn app.main:app -w 1 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT 
